@@ -223,7 +223,7 @@ function apc_custom_taxonomies_render() {
         <?php foreach ($custom_taxonomies as $index => $taxonomy) : ?>
             <div class="apc-taxonomy-row">
                 <input type="text" name="apc_settings[apc_custom_taxonomies][<?php echo $index; ?>][taxonomy]" value="<?php echo esc_attr($taxonomy['taxonomy']); ?>" placeholder="Taxonomy">
-                <input type="text" name="apc_settings[apc_custom_taxonomies][<?php echo $index; ?>][terms]" value="<?php echo esc_attr($taxonomy['terms']); ?>" placeholder="Terms (comma-separated)">
+                <input type="text" name="apc_settings[apc_custom_taxonomies][<?php echo $index; ?>][terms]" value="<?php echo esc_attr($taxonomy['terms']); ?>" placeholder="Comma separated term IDs">
                 <button type="button" class="apc-button apc-remove-taxonomy">Remove</button>
             </div>
         <?php endforeach; ?>
@@ -307,7 +307,7 @@ if (!empty($options['apc_default_weight'])) {
         foreach ($options['apc_custom_taxonomies'] as $custom_taxonomy) {
             if (!empty($custom_taxonomy['taxonomy']) && !empty($custom_taxonomy['terms'])) {
                 $terms = array_map('trim', explode(',', $custom_taxonomy['terms']));
-                wp_set_object_terms($product->get_id(), $terms, $custom_taxonomy['taxonomy']);
+                wp_set_object_terms($product->get_id(), (int)$terms, $custom_taxonomy['taxonomy']);
             }
         }
     }
