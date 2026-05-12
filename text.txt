@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Auto Product Creator From Media
  * Description: Creates a new simple product in draft status when a media file is uploaded.
- * Version: 1.0.1
+ * Version: 1.0
  * Author: Israel Mateo Manzano
  * Author URI: https://cachitoswp.com
  */
@@ -59,104 +59,6 @@ function apc_add_admin_menu() {
         56
     );
 }
-
-add_action('admin_menu', function() {
-
-
-    add_submenu_page(
-        'auto_product_creator',
-        __('Create from Media', 'auto-product-creator-from-media'),
-        __('Create from Media', 'auto-product-creator-from-media'),
-        'manage_options',
-        'apc_create_from_media',
-        'apc_render_create_from_media_page'
-    );
-});
-
-function apc_render_create_from_media_page() {
-
-    if (isset($_GET['created'])) {
-        echo '<div class="notice notice-success"><p>' .
-             sprintf(__('Created %d products successfully.', 'auto-product-creator-from-media'), intval($_GET['created'])) .
-             '</p></div>';
-    }
-    ?>
-
-    <div class="wrap">
-        <h1><?php _e('Create Products from Existing Media', 'auto-product-creator-from-media'); ?></h1>
-
-        <p><?php _e('Select one or more images from the media library to create products automatically.', 'auto-product-creator-from-media'); ?></p>
-
-        <button id="apc-select-images" class="button button-primary">
-            <?php _e('Select Images', 'auto-product-creator-from-media'); ?>
-        </button>
-
-        <form id="apc-create-products-form" method="post">
-            <input type="hidden" name="apc_selected_images" id="apc_selected_images">
-            <?php submit_button(__('Create Products', 'auto-product-creator-from-media')); ?>
-        </form>
-    </div>
-
-    <script>
-    jQuery(document).ready(function($){
-        var frame;
-
-        $('#apc-select-images').on('click', function(e){
-            e.preventDefault();
-
-            if (frame) {
-                frame.open();
-                return;
-            }
-
-            frame = wp.media({
-                title: '<?php _e("Select Images", "auto-product-creator-from-media"); ?>',
-                multiple: true,
-                library: { type: 'image' }
-            });
-
-            frame.on('select', function(){
-                var selection = frame.state().get('selection');
-                var ids = [];
-
-                selection.each(function(attachment){
-                    ids.push(attachment.id);
-                });
-
-                $('#apc_selected_images').val(ids.join(','));
-            });
-
-            frame.open();
-        });
-    });
-    </script>
-
-    <?php
-}
-
-
-add_action('admin_init', function() {
-    if (!isset($_POST['apc_selected_images'])) {
-        return;
-    }
-
-    $ids = explode(',', sanitize_text_field($_POST['apc_selected_images']));
-
-    foreach ($ids as $id) {
-        apc_create_simple_product_automatically($id);
-    }
-
-    wp_redirect(add_query_arg('created', count($ids), menu_page_url('apc_create_from_media', false)));
-    exit;
-});
-
-
-if (isset($_GET['created'])) {
-    echo '<div class="notice notice-success"><p>' .
-         sprintf(__('Created %d products successfully.', 'auto-product-creator-from-media'), intval($_GET['created'])) .
-         '</p></div>';
-}
-
 
 function apc_settings_init() {
     
@@ -284,7 +186,7 @@ function apc_default_tags_render() {
     $options = get_option('apc_settings', array());
     ?>
     <input type='text' name='apc_settings[apc_default_tags]' value='<?php echo $options['apc_default_tags'] ?? ''; ?>'>
-    <p class="description">Enter tag IDs separated by commas</p>
+    <p class="description">Enter tags separated by commas</p>
     <?php
 }
 
@@ -377,6 +279,12 @@ function apc_create_simple_product_automatically($image_id) {
         $product->set_category_ids(array($options['apc_default_category']));
     }
     
+    // Set default tags
+    if (!empty($options['apc_default_tags'])) {
+        $tags = explode(',', $options['apc_default_tags']);
+        $product->set_tag_ids($tags);
+    }
+    
     // Set default price
     if (!empty($options['apc_default_price'])) {
         $product->set_regular_price($options['apc_default_price']);
@@ -393,6 +301,16 @@ if (!empty($options['apc_default_weight'])) {
         $product->set_width($options['apc_default_width']);
         $product->set_height($options['apc_default_height']);
     }
+
+    // Set custom taxonomies
+    if (!empty($options['apc_custom_taxonomies'])) {
+        foreach ($options['apc_custom_taxonomies'] as $custom_taxonomy) {
+            if (!empty($custom_taxonomy['taxonomy']) && !empty($custom_taxonomy['terms'])) {
+                $terms = array_map('trim', explode(',', $custom_taxonomy['terms']));
+                wp_set_object_terms($product->get_id(), (int)$terms, $custom_taxonomy['taxonomy']);
+            }
+        }
+    }
     
     // Set product description from image caption
     $attachment = get_post($image_id);
@@ -404,26 +322,6 @@ if (!empty($options['apc_default_weight'])) {
     $product->set_image_id($image_id);
     
     // Save the product
-    $product_id = $product->save();
-
-    // Set default tags
-    if (!empty($options['apc_default_tags'])) {
-        $tags = array_filter(array_map('absint', array_map('trim', explode(',', $options['apc_default_tags']))));
-        if (!empty($tags)) {
-            wp_set_object_terms($product_id, $tags, 'product_tag');
-        }
-    }
-
-    // Set custom taxonomies
-    if (!empty($options['apc_custom_taxonomies'])) {
-        foreach ($options['apc_custom_taxonomies'] as $custom_taxonomy) {
-            if (!empty($custom_taxonomy['taxonomy']) && !empty($custom_taxonomy['terms']) && taxonomy_exists($custom_taxonomy['taxonomy'])) {
-                $terms = array_filter(array_map('absint', array_map('trim', explode(',', $custom_taxonomy['terms']))));
-                if (!empty($terms)) {
-                    wp_set_object_terms($product_id, $terms, $custom_taxonomy['taxonomy']);
-                }
-            }
-        }
-    }
+    $product->save();
 }
 
